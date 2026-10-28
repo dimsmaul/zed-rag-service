@@ -1,0 +1,27 @@
+[package]
+name = "zed-rag-service"
+version = "0.1.0"
+edition = "2021"
+authors = ["Dimas Maulana <dimsmaul@users.noreply.github.com>"]
+description = "Cloud RAG & Guardrail microservice for the Zed Harness Agent"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.38", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  rag-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/dimsmaul/zed-rag-service:latest
+    container_name: zed-rag-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - RUST_LOG=info
+      - DB_PATH=/app/data/rag.db
+    volumes:
+      - rag-data:/app/data
+
+volumes:
+  rag-data:
