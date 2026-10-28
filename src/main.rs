@@ -7,7 +7,7 @@ use anyhow::Result;
 use axum::{
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use db::Database;

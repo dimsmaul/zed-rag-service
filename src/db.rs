@@ -3,6 +3,14 @@ use rusqlite::{params, Connection};
 use std::sync::{Arc, Mutex};
 use crate::models::GuardrailConfig;
 
+struct DocRecord {
+    id: String,
+    title: String,
+    category: String,
+    content: String,
+    tags_json: String,
+}
+
 #[derive(Clone)]
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -114,46 +122,45 @@ impl Database {
         let query_lower = query.to_lowercase();
         let terms: Vec<&str> = query_lower.split_whitespace().collect();
 
-        let mut sql = String::from(
-            "SELECT id, title, category, content, tags_json FROM documents WHERE workspace_id = ?1",
-        );
-        if category.is_some() {
-            sql.push_str(" AND category = ?2");
+        let mut records: Vec<DocRecord> = Vec::new();
+
+        if let Some(cat) = category {
+            let mut stmt = conn.prepare(
+                "SELECT id, title, category, content, tags_json FROM documents WHERE workspace_id = ?1 AND category = ?2"
+            )?;
+            let mut rows = stmt.query(params![workspace_id, cat])?;
+            while let Some(row) = rows.next()? {
+                records.push(DocRecord {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    category: row.get(2)?,
+                    content: row.get(3)?,
+                    tags_json: row.get(4)?,
+                });
+            }
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, title, category, content, tags_json FROM documents WHERE workspace_id = ?1"
+            )?;
+            let mut rows = stmt.query(params![workspace_id])?;
+            while let Some(row) = rows.next()? {
+                records.push(DocRecord {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    category: row.get(2)?,
+                    content: row.get(3)?,
+                    tags_json: row.get(4)?,
+                });
+            }
         }
 
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = if let Some(cat) = category {
-            stmt.query_map(params![workspace_id, cat], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                ))
-            })?
-        } else {
-            stmt.query_map(params![workspace_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                ))
-            })?
-        };
-
         let mut results = Vec::new();
-        for row in rows {
-            let (id, title, cat, content, tags_json) = row?;
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-            
-            // Lexical scoring based on term frequency & title match
-            let text_to_search = format!("{} {} {}", title.to_lowercase(), cat.to_lowercase(), content.to_lowercase());
+        for doc in records {
+            let tags: Vec<String> = serde_json::from_str(&doc.tags_json).unwrap_or_default();
+            let text_to_search = format!("{} {} {}", doc.title.to_lowercase(), doc.category.to_lowercase(), doc.content.to_lowercase());
             let mut score = 0.0f32;
             for term in &terms {
-                if title.to_lowercase().contains(term) {
+                if doc.title.to_lowercase().contains(term) {
                     score += 2.0;
                 }
                 if text_to_search.contains(term) {
@@ -162,7 +169,7 @@ impl Database {
             }
 
             if score > 0.0 || terms.is_empty() {
-                results.push((id, title, cat, content, tags, score));
+                results.push((doc.id, doc.title, doc.category, doc.content, tags, score));
             }
         }
 
